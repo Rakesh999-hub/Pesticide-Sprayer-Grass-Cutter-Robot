@@ -1,0 +1,278 @@
+
+
+// L298N Motor Driver #1 (Drive Motors)
+#define IN1_LEFT 2      // Left motors forward
+#define IN2_LEFT 3      // Left motors backward
+#define IN3_RIGHT 4     // Right motors forward
+#define IN4_RIGHT 5     // Right motors backward
+#define ENA_LEFT 9      // Left motors PWM speed control
+#define ENB_RIGHT 10    // Right motors PWM speed control
+
+// L298N Motor Driver #2 (Cutter Motor)
+#define IN1_CUTTER 6    // Cutter forward
+#define IN2_CUTTER 7    // Cutter reverse (optional)
+#define ENA_CUTTER 11   // Cutter PWM speed control
+
+// Relay Module
+#define RELAY_PUMP 12   // Pump relay control
+#define RELAY_CUTTER 13 // Cutter safety relay (optional)
+
+// ====== VARIABLES ======
+char btCommand = 'S';        // Bluetooth command
+int motorSpeed = 200;        // Motor speed (0-255), default medium
+int cutterSpeed = 255;       // Cutter speed (full speed)
+bool pumpState = false;      // Pump ON/OFF state
+bool cutterState = false;    // Cutter ON/OFF state
+
+// ====== SETUP ======
+void setup() {
+  // Initialize Serial for Bluetooth (HC-05)
+  Serial.begin(9600);
+  
+  // Set all motor control pins as OUTPUT
+  pinMode(IN1_LEFT, OUTPUT);
+  pinMode(IN2_LEFT, OUTPUT);
+  pinMode(IN3_RIGHT, OUTPUT);
+  pinMode(IN4_RIGHT, OUTPUT);
+  pinMode(ENA_LEFT, OUTPUT);
+  pinMode(ENB_RIGHT, OUTPUT);
+  
+  pinMode(IN1_CUTTER, OUTPUT);
+  pinMode(IN2_CUTTER, OUTPUT);
+  pinMode(ENA_CUTTER, OUTPUT);
+  
+  pinMode(RELAY_PUMP, OUTPUT);
+  pinMode(RELAY_CUTTER, OUTPUT);
+  
+  // Initialize all motors to STOP
+  stopAllMotors();
+  
+  // Initialize relays to OFF
+  digitalWrite(RELAY_PUMP, LOW);
+  digitalWrite(RELAY_CUTTER, LOW);
+  
+  // Welcome message
+  Serial.println("Pesticide Sprayer Robot Ready!");
+  Serial.println("Commands: F=Forward, B=Back, L=Left, R=Right, S=Stop");
+  Serial.println("P=Pump Toggle, C=Cutter Toggle, 1-9=Speed");
+}
+
+// ====== MAIN LOOP ======
+void loop() {
+  // Check for Bluetooth commands
+  if (Serial.available() > 0) {
+    btCommand = Serial.read();
+    executeCommand(btCommand);
+  }
+}
+
+// ====== COMMAND EXECUTION ======
+void executeCommand(char cmd) {
+  switch(cmd) {
+    case 'F':  // Forward
+    case 'f':
+      moveForward();
+      Serial.println("Moving Forward");
+      break;
+      
+    case 'B':  // Backward
+    case 'b':
+      moveBackward();
+      Serial.println("Moving Backward");
+      break;
+      
+    case 'L':  // Left
+    case 'l':
+      turnLeft();
+      Serial.println("Turning Left");
+      break;
+      
+    case 'R':  // Right
+    case 'r':
+      turnRight();
+      Serial.println("Turning Right");
+      break;
+      
+    case 'S':  // Stop
+    case 's':
+      stopAllMotors();
+      Serial.println("Stopped");
+      break;
+      
+    case 'P':  // Pump toggle
+    case 'p':
+      togglePump();
+      break;
+      
+    case 'C':  // Cutter toggle
+    case 'c':
+      toggleCutter();
+      break;
+      
+    // Speed control (1-9)
+    case '1': setSpeed(50); break;
+    case '2': setSpeed(75); break;
+    case '3': setSpeed(100); break;
+    case '4': setSpeed(125); break;
+    case '5': setSpeed(150); break;
+    case '6': setSpeed(175); break;
+    case '7': setSpeed(200); break;
+    case '8': setSpeed(225); break;
+    case '9': setSpeed(255); break;
+      
+    default:
+      // Unknown command
+      break;
+  }
+}
+
+// ====== MOVEMENT FUNCTIONS ======
+
+void moveForward() {
+  // Left motors forward
+  digitalWrite(IN1_LEFT, HIGH);
+  digitalWrite(IN2_LEFT, LOW);
+  analogWrite(ENA_LEFT, motorSpeed);
+  
+  // Right motors forward
+  digitalWrite(IN3_RIGHT, HIGH);
+  digitalWrite(IN4_RIGHT, LOW);
+  analogWrite(ENB_RIGHT, motorSpeed);
+}
+
+void moveBackward() {
+  // Left motors backward
+  digitalWrite(IN1_LEFT, LOW);
+  digitalWrite(IN2_LEFT, HIGH);
+  analogWrite(ENA_LEFT, motorSpeed);
+  
+  // Right motors backward
+  digitalWrite(IN3_RIGHT, LOW);
+  digitalWrite(IN4_RIGHT, HIGH);
+  analogWrite(ENB_RIGHT, motorSpeed);
+}
+
+void turnLeft() {
+  // Left motors backward (or stop)
+  digitalWrite(IN1_LEFT, LOW);
+  digitalWrite(IN2_LEFT, HIGH);
+  analogWrite(ENA_LEFT, motorSpeed * 0.5); // Slower turn
+  
+  // Right motors forward
+  digitalWrite(IN3_RIGHT, HIGH);
+  digitalWrite(IN4_RIGHT, LOW);
+  analogWrite(ENB_RIGHT, motorSpeed);
+}
+
+void turnRight() {
+  // Left motors forward
+  digitalWrite(IN1_LEFT, HIGH);
+  digitalWrite(IN2_LEFT, LOW);
+  analogWrite(ENA_LEFT, motorSpeed);
+  
+  // Right motors backward (or stop)
+  digitalWrite(IN3_RIGHT, LOW);
+  digitalWrite(IN4_RIGHT, HIGH);
+  analogWrite(ENB_RIGHT, motorSpeed * 0.5); // Slower turn
+}
+
+void stopAllMotors() {
+  // Stop left motors
+  digitalWrite(IN1_LEFT, LOW);
+  digitalWrite(IN2_LEFT, LOW);
+  analogWrite(ENA_LEFT, 0);
+  
+  // Stop right motors
+  digitalWrite(IN3_RIGHT, LOW);
+  digitalWrite(IN4_RIGHT, LOW);
+  analogWrite(ENB_RIGHT, 0);
+}
+
+// ====== CUTTER FUNCTIONS ======
+
+void toggleCutter() {
+  cutterState = !cutterState;
+  
+  if (cutterState) {
+    // Turn ON cutter
+    digitalWrite(RELAY_CUTTER, HIGH);  // Enable power relay
+    delay(100);  // Small delay for relay
+    digitalWrite(IN1_CUTTER, HIGH);
+    digitalWrite(IN2_CUTTER, LOW);
+    analogWrite(ENA_CUTTER, cutterSpeed);
+    Serial.println("Cutter ON");
+  } else {
+    // Turn OFF cutter
+    digitalWrite(IN1_CUTTER, LOW);
+    digitalWrite(IN2_CUTTER, LOW);
+    analogWrite(ENA_CUTTER, 0);
+    delay(100);
+    digitalWrite(RELAY_CUTTER, LOW);  // Disable power relay
+    Serial.println("Cutter OFF");
+  }
+}
+
+// ====== PUMP FUNCTIONS ======
+
+void togglePump() {
+  pumpState = !pumpState;
+  
+  if (pumpState) {
+    digitalWrite(RELAY_PUMP, HIGH);  // Turn ON pump
+    Serial.println("Pump ON - Spraying");
+  } else {
+    digitalWrite(RELAY_PUMP, LOW);   // Turn OFF pump
+    Serial.println("Pump OFF");
+  }
+}
+
+// ====== SPEED CONTROL ======
+
+void setSpeed(int speed) {
+  motorSpeed = speed;
+  
+  // Update current motor speeds if moving
+  if (btCommand == 'F' || btCommand == 'f') {
+    moveForward();
+  } else if (btCommand == 'B' || btCommand == 'b') {
+    moveBackward();
+  } else if (btCommand == 'L' || btCommand == 'l') {
+    turnLeft();
+  } else if (btCommand == 'R' || btCommand == 'r') {
+    turnRight();
+  }
+  
+  Serial.print("Speed set to: ");
+  Serial.println(speed);
+}
+
+// ====== SAFETY FUNCTIONS ======
+
+// Emergency stop function (can be called from anywhere)
+void emergencyStop() {
+  stopAllMotors();
+  digitalWrite(RELAY_PUMP, LOW);
+  digitalWrite(RELAY_CUTTER, LOW);
+  digitalWrite(IN1_CUTTER, LOW);
+  digitalWrite(IN2_CUTTER, LOW);
+  analogWrite(ENA_CUTTER, 0);
+  
+  pumpState = false;
+  cutterState = false;
+  
+  Serial.println("!!! EMERGENCY STOP !!!");
+}
+
+// Optional: Monitor battery voltage (if connected to A0)
+/*
+float checkBatteryVoltage() {
+  int sensorValue = analogRead(A0);
+  float voltage = sensorValue * (12.0 / 1023.0) * 2; // Adjust multiplier based on voltage divider
+  
+  if (voltage < 10.5) {
+    Serial.println("WARNING: Low Battery!");
+  }
+  
+  return voltage;
+}
+*/
